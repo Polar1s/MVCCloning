@@ -1,9 +1,8 @@
+#include "MVCStitch.h"
 #include <opencv2/opencv.hpp>
 #include <cstdio>
-#include "MVCStitch.h"
 
 using namespace std;
-using namespace cv;
 
 int main(int argc, char **argv) {
     MVCStitch stitch;

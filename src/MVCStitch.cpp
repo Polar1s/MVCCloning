@@ -1,6 +1,5 @@
 #include "MVCStitch.h"
 #include "triangulate.h"
-#include "Vector3d.h"
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -29,7 +28,7 @@ void MVCStitch::getContour(vector<Point>& contours) {
     mask.copyTo(tmp(Rect(1, 1, w, h)));
 
     // Invoke OpenCV interface
-    vector<vector<Point>> _contours;
+    vector<vector<Point> > _contours;
     vector<Vec4i> hierarchy;
     findContours(tmp, _contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, Point(-1, -1));
 
@@ -77,8 +76,8 @@ void MVCStitch::getMVCCoordinates() {
             Vector3d v1 = p1 - pointX;
             Vector3d v2 = p2 - pointX;
 
-            double a01 = fabs(angle(v0, v1));
-            double a12 = fabs(angle(v1, v2));
+            double a01 = fabs(angleBetween(v0, v1));
+            double a12 = fabs(angleBetween(v1, v2));
 
             weights[idx] = (tan(a01 / 2.0) + tan(a12 / 2.0)) / (v1.norm() + 0.001);
             sum += weights[idx];

@@ -1,6 +1,7 @@
 #ifndef MVCSTITCH_H
 #define MVCSTITCH_H
 
+#include "Vector3d.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/gpu/gpu.hpp>
 #include <string>
@@ -59,7 +60,7 @@ private:
     std::vector<int> MVCTriangles;
 
     // Region point list
-    std::vector<std::pair<int, mvc::Vector3d>> MVCRegionPoints;
+    std::vector<std::pair<int, mvc::Vector3d> > MVCRegionPoints;
 
     // MVC Coordinates
     double *mvc;

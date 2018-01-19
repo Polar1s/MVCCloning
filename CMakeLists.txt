@@ -1,0 +1,40 @@
+# CMake version requirement
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+
+# Project name
+PROJECT(MVCCloning)
+
+# Check for OpenCV
+FIND_PACKAGE(OpenCV REQUIRED)
+IF (OpenCV_FOUND)
+    INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
+    MESSAGE(STATUS "Found OpenCV.")
+ELSE()
+    MESSAGE(FATAL_ERROR "OpenCV not found!")
+ENDIF()
+
+# Check for CGAL
+FIND_PACKAGE(CGAL REQUIRED QUIET COMPONENTS)
+IF (CGAL_FOUND)
+    INCLUDE(${CGAL_USE_FILE})
+    INCLUDE_DIRECTORIES(${CGAL_INCLUDE_DIRS})
+    MESSAGE(STATUS "Found CGAL.")
+ELSE()
+    MESSAGE(FATAL_ERROR "CGAL not found!")
+ENDIF()
+
+# Environmental variables
+SET(CMAKE_C_COMPILER "/usr/bin/gcc")
+SET(CMAKE_CXX_COMPILER "/usr/bin/g++")
+
+# Header directories
+INCLUDE_DIRECTORIES(include)
+
+# Source directories
+AUX_SOURCE_DIRECTORY(src DIR_SRCS)
+
+# Execution
+ADD_EXECUTABLE(mvcclone ${DIR_SRCS})
+
+# Link
+TARGET_LINK_LIBRARIES(mvcclone ${OpenCV_LIBS} ${CGAL_LIBS})
