@@ -12,7 +12,7 @@ public:
     ~MVCStitch();
 
     // Initialize source patch and mask
-    void init(std::string srcFile, std::string maskFile);
+    void init(std::string srcFile);
 
     // Clone source image to target image, then save the result
     void stitch(std::string targetFile, std::string outFile);
@@ -64,6 +64,10 @@ private:
 
     // MVC Coordinates
     double *mvc;
+
+public:
+    // Offset from source patch to target image
+    cv::Point offset;
 
 };
 

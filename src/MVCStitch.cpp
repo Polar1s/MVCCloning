@@ -4,6 +4,9 @@
 #include <cstring>
 #include <vector>
 
+// Debug switch
+// #define DEBUG
+
 using namespace std;
 using namespace cv;
 using namespace mvc;
@@ -24,7 +27,7 @@ void MVCStitch::getContour(vector<Point>& contours) {
     contours.clear();
 
     // Add brinks for input mask
-    Mat tmp = Mat::zeros(h + 2, w + 2, mask.type());
+    Mat tmp = Mat::zeros(h + 2, w + 2, CV_8U);
     mask.copyTo(tmp(Rect(1, 1, w, h)));
 
     // Invoke OpenCV interface
@@ -80,6 +83,10 @@ void MVCStitch::getMVCCoordinates() {
             double a12 = fabs(angleBetween(v1, v2));
 
             weights[idx] = (tan(a01 / 2.0) + tan(a12 / 2.0)) / (v1.norm() + 0.001);
+
+            if (weights[idx] < 0.0)
+                printf("Error! MVC coordinate less than zero.\n");
+
             sum += weights[idx];
         }
 
@@ -110,8 +117,8 @@ bool MVCStitch::insideTriangle(const Point& p, const Point& p0, const Point& p1,
     coords.x = (double)cross1 / crossA;
     coords.y = (double)cross2 / crossA;
 
-    return cross0 <= 0 && cross1 <= 0 && cross2 <= 0 && crossA < 0 ||
-        cross0 >= 0 && cross1 >= 0 && cross2 >= 0 && crossA > 0;
+    return cross0 <= 0 && cross1 <= 0 && cross2 <= 0 ||
+        cross0 >= 0 && cross1 >= 0 && cross2 >= 0;
 }
 
 void MVCStitch::findTriangle() {
@@ -127,9 +134,9 @@ void MVCStitch::findTriangle() {
         Point p2 = MVCVertices[MVCTriangles[curIndex + 2]];
 
         // First add Vertices (optional?)
-        // MVCRegionPoints.push_back(make_pair<>(i, Vector3d(1.0, 0.0, 0.0)));
-        // MVCRegionPoints.push_back(make_pair<>(i, Vector3d(0.0, 1.0, 0.0)));
-        // MVCRegionPoints.push_back(make_pair<>(i, Vector3d(0.0, 0.0, 1.0)));
+        MVCRegionPoints.push_back(make_pair<>(i, Vector3d(1.0, 0.0, 0.0)));
+        MVCRegionPoints.push_back(make_pair<>(i, Vector3d(0.0, 1.0, 0.0)));
+        MVCRegionPoints.push_back(make_pair<>(i, Vector3d(0.0, 0.0, 1.0)));
 
         // Calculate rectangle boundary
         int L = MIN(MIN(p0.x, p1.x), p2.x);
@@ -165,17 +172,13 @@ void MVCStitch::MVCPrecompute() {
     findTriangle();
 }
 
-void MVCStitch::init(string srcFile, string maskFile) {
+void MVCStitch::init(string srcFile) {
     // Read source and mask image
     src = imread(srcFile);
-    mask = imread(maskFile, 0);
 
-    // Save image size
+    // Obtain image mask
     h = src.rows, w = src.cols;
-    if (mask.rows != h || mask.cols != w) {
-        printf("Error: source and mask are of different sizes\n");
-        return;
-    }
+    cvtColor(src, mask, COLOR_BGR2GRAY);
 
     // Find contours inside mask
     vector<Point> contours;
@@ -187,6 +190,12 @@ void MVCStitch::init(string srcFile, string maskFile) {
     for (int i = 0; i < nPoints; i++)
         if (find(boundary.begin(), boundary.end(), contours[i]) == boundary.end())
             boundary.push_back(contours[i]);
+
+#ifdef DEBUG
+    nPoints = boundary.size();
+    for (int i = 0; i < nPoints; i++)
+        printf("(%d, %d)\n", boundary[i].x, boundary[i].y);
+#endif
 
     boundaryIndex.clear();
     nPoints = boundary.size();
@@ -222,11 +231,11 @@ void MVCStitch::stitch(string targetFile, string outFile) {
     int nPoints = boundary.size();
     for (int i = 0; i < nPoints; i++) {
         Vec3b colorS = src.at<Vec3b>(boundary[i]);
-        Vec3b colorT = target.at<Vec3b>(boundary[i]);
+        Vec3b colorT = target.at<Vec3b>(boundary[i] + offset);
         
-        boundaryDiff.push_back(colorS[2] - colorT[2]);
-        boundaryDiff.push_back(colorS[1] - colorT[1]);
-        boundaryDiff.push_back(colorS[0] - colorT[0]);
+        boundaryDiff.push_back((int)colorT[2] - (int)colorS[2]);
+        boundaryDiff.push_back((int)colorT[1] - (int)colorS[1]);
+        boundaryDiff.push_back((int)colorT[0] - (int)colorS[0]);
     }
 
     // Apply color difference to MVC vertices and record the difference value
@@ -246,12 +255,12 @@ void MVCStitch::stitch(string targetFile, string outFile) {
         }
 
         // Compute result color
-        Vec3b color = target.at<Vec3b>(MVCVertices[i]);
+        Vec3b color = src.at<Vec3b>(MVCVertices[i]);
         color[2] = (uchar)MAX(MIN(color[2] + dr, 255), 0);
         color[1] = (uchar)MAX(MIN(color[1] + dg, 255), 0);
         color[0] = (uchar)MAX(MIN(color[0] + db, 255), 0);
 
-        res.at<Vec3b>(MVCVertices[i]) = color;
+        res.at<Vec3b>(MVCVertices[i] + offset) = color;
 
         membrane.push_back(dr);
         membrane.push_back(dg);
@@ -279,12 +288,15 @@ void MVCStitch::stitch(string targetFile, string outFile) {
         double db = coords.x * membrane[i0 * 3 + 2] + coords.y * membrane[i1 * 3 + 2] + coords.z * membrane[i2 * 3 + 2];
 
         // Compute result color
-        Vec3b color = target.at<Vec3b>(y, x);
+        Vec3b color = src.at<Vec3b>(y, x);
+        if (color[0] == 0 && color[1] == 0 && color[2] == 0)
+            continue;
+        
         color[2] = (uchar)MAX(MIN(color[2] + dr, 255), 0);
         color[1] = (uchar)MAX(MIN(color[1] + dg, 255), 0);
         color[0] = (uchar)MAX(MIN(color[0] + db, 255), 0);
 
-        res.at<Vec3b>(y, x) = color;
+        res.at<Vec3b>(y + offset.y, x + offset.x) = color;
     }
 
     // Finally write output image
